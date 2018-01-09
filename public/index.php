@@ -32,11 +32,22 @@ if ($debug) {
     Debug::enable();
 }
 
-// This is enabled to allow for correctly handling HTTPS on Heroku
-Request::setTrustedProxies(['0.0.0.0/0'], Request::HEADER_X_FORWARDED_ALL ^ Request::HEADER_X_FORWARDED_HOST);
-
 $kernel = new Kernel($env, $debug);
 $request = Request::createFromGlobals();
+
+// This is enabled to allow for correctly handling HTTPS on Heroku:
+// https://devcenter.heroku.com/articles/getting-started-with-symfony#trusting-the-load-balancer
+// The code snippet in the Heroku docs is for the Symfony 3 branch;
+// the way it worked was by adding headers to a blacklist by calling
+// Request::setTrustedHeaderName($name, $value) with $value set to null.
+// In Symfony 4, Request::setTrustedProxies() takes a second parameter,
+// which defines a whitelist, so instead of removing the headers we don't want to trust,
+// we explicitly state a bit field of which headers can be trusted.
+Request::setTrustedProxies(
+    [$request->server->get('REMOTE_ADDR')],
+    Request::HEADER_X_FORWARDED_ALL ^ Request::HEADER_X_FORWARDED_HOST
+);
+
 $response = $kernel->handle($request);
 $response->send();
 $kernel->terminate($request, $response);
